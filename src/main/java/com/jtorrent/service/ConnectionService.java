@@ -7,6 +7,7 @@ import com.jtorrent.protocol.ResponseType;
 import java.net.SocketTimeoutException;
 
 public class ConnectionService {
+    private ConnectionService() {}
 
     private static final int MAX_RETRIES = 8;
     private static final int BASE_DELAY_SECONDS = 15;

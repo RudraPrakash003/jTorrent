@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 public class AnnounceService {
+    private AnnounceService() {}
 
     private static final int MAX_RETRIES = 8;
     private static final int BASE_DELAY_SECONDS = 15;

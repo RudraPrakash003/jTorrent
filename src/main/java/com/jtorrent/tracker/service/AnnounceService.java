@@ -1,9 +1,9 @@
-package com.jtorrent.service;
+package com.jtorrent.tracker.service;
 
 import com.jtorrent.model.Peer;
 import com.jtorrent.network.UdpClient;
-import com.jtorrent.protocol.AnnounceProtocol;
-import com.jtorrent.protocol.ResponseType;
+import com.jtorrent.tracker.protocol.AnnounceProtocol;
+import com.jtorrent.tracker.protocol.ResponseType;
 import com.jtorrent.utils.TorrentSize;
 
 import java.net.SocketTimeoutException;

@@ -2,8 +2,8 @@ package com.jtorrent.tracker;
 
 import com.jtorrent.model.Peer;
 import com.jtorrent.network.UdpClient;
-import com.jtorrent.service.AnnounceService;
-import com.jtorrent.service.ConnectionService;
+import com.jtorrent.tracker.service.AnnounceService;
+import com.jtorrent.tracker.service.ConnectionService;
 
 import java.net.*;
 import java.util.List;

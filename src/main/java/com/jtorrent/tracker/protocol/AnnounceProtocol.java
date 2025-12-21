@@ -1,4 +1,4 @@
-package com.jtorrent.protocol;
+package com.jtorrent.tracker.protocol;
 
 import com.jtorrent.model.Peer;
 import com.jtorrent.utils.GeneratePeerId;

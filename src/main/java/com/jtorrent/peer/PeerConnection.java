@@ -37,6 +37,12 @@ public class PeerConnection implements AutoCloseable {
         HandshakeValidator.validate(response, infoHash);
     }
 
+    public void startMessageLoop() throws Exception {
+        PeerMessageReader reader = new PeerMessageReader();
+
+        reader.read(inputStream, message -> System.out.println("Received message from "+ peer + ", length =" + message.length));
+    }
+
     @Override
     public void close() throws Exception {
         if (socket != null && !socket.isClosed()) {
@@ -44,4 +50,9 @@ public class PeerConnection implements AutoCloseable {
         }
     }
 
+    public void closeQuietly() {
+        try{
+            close();
+        } catch (Exception ignored){}
+    }
 }

@@ -20,12 +20,22 @@ public class PeerManager {
     }
 
     public void connectPeer(Peer peer) {
-        try(PeerConnection connection = new PeerConnection(peer, infoHash)) {
+        PeerConnection connection = new PeerConnection(peer, infoHash);
+        try {
             connection.connect();
             connection.handshake();
+
+            Thread t = new Thread(() -> {
+                try{
+                    connection.startMessageLoop();
+                } catch (Exception e) {
+                    connection.closeQuietly();
+                }
+            });
+            t.start();
         } catch (Exception e) {
+            connection.closeQuietly();
             System.out.println("Connection failed for Peer: " + peer);
         }
-
     }
 }

@@ -4,7 +4,6 @@ import com.jtorrent.utils.GeneratePeerId;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Random;
 
 public class PeerMessageBuilder {
 
@@ -105,9 +104,10 @@ public class PeerMessageBuilder {
     }
 
     public static byte[] buildPiece(int index, int begin, byte[] block) {
-        ByteBuffer buffer = ByteBuffer.allocate(block.length + 9);
+        ByteBuffer buffer = ByteBuffer.allocate(block.length + 13);
         buffer.order(ByteOrder.BIG_ENDIAN);
 
+        buffer.putInt(block.length + 9);
         buffer.put((byte) 7);
         buffer.putInt(index);
         buffer.putInt(begin);

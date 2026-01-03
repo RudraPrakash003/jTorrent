@@ -1,4 +1,4 @@
-package com.jtorrent.network;
+package com.jtorrent.tracker;
 
 import java.io.IOException;
 import java.net.*;

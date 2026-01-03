@@ -1,8 +1,8 @@
-package com.jtorrent.utils;
+package com.jtorrent.metaInfo;
 
 import java.security.SecureRandom;
 
-public class GeneratePeerId {
+public class ClientId {
     private static byte[] peerId;
     public static byte[] generateId() {
         if(peerId == null) {

@@ -1,9 +1,6 @@
 package com.jtorrent.tracker;
 
-import com.jtorrent.model.Peer;
-import com.jtorrent.network.UdpClient;
-import com.jtorrent.tracker.service.AnnounceService;
-import com.jtorrent.tracker.service.ConnectionService;
+import com.jtorrent.peer.Peer;
 
 import java.net.*;
 import java.util.List;
@@ -11,7 +8,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class Tracker {
-    public void getPeers(String announce, byte[] infoHash, Map<String, Object> torrent, Consumer<List<Peer>> callback) {
+    public void getPeers(String announce, byte[] infoHash, Map<String, Object> torrent, byte[] peerId, Consumer<List<Peer>> callback) {
         try (UdpClient udp = new UdpClient()) {
 
             URI uri = new URI(announce);
@@ -21,8 +18,8 @@ public class Tracker {
 //            System.out.println(announce);
 //            System.out.println(host + ":" + port);
 
-            long connectionId = ConnectionService.connect(udp, host, port);
-            List<Peer> peers = AnnounceService.announce(udp, connectionId, infoHash, torrent, host, port);
+            long connectionId = TrackerConnection.connect(udp, host, port);
+            List<Peer> peers = TrackerAnnounce.announce(udp, connectionId, infoHash, torrent, host, port, peerId);
 
             callback.accept(peers);
 

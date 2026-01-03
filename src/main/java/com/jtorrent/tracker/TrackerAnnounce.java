@@ -1,22 +1,51 @@
-package com.jtorrent.tracker.protocol;
+package com.jtorrent.tracker;
 
-import com.jtorrent.model.Peer;
-import com.jtorrent.utils.GeneratePeerId;
+import com.jtorrent.metaInfo.TorrentMetaData;
+import com.jtorrent.peer.Peer;
 
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
-public class AnnounceProtocol {
+import static com.jtorrent.util.Buffers.allocate;
+import static com.jtorrent.util.Buffers.wrap;
 
+public class TrackerAnnounce {
+    private TrackerAnnounce() {}
+
+    private static final int MAX_RETRIES = 8;
+    private static final int BASE_DELAY_SECONDS = 15;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    public static  byte[] buildAnnounceRequest(long connectionId, byte[] infoHash, long left, int port) {
-        ByteBuffer buffer = ByteBuffer.allocate(98);
+    public static List<Peer> announce(UdpClient udp, long connectionId, byte[] infoHash, Map<String, Object> torrent, String host, int port, byte[] peerId) throws Exception{
 
-        buffer.order(ByteOrder.BIG_ENDIAN);
+        long left = TorrentMetaData.totalSize(torrent);
+        byte[] announceRequest = buildRequest(connectionId, infoHash, left, port, peerId);
+        for(int attempt = 0;  attempt < MAX_RETRIES; attempt++){
+            try {
+                udp.send(announceRequest, host, port);
+
+                byte[] responseData = udp.receive();
+
+                if(!ResponseType.getType(responseData).equals("announce")) {
+                    throw new RuntimeException("Announce action mismatched");
+                }
+
+                return parseResponse(responseData, announceRequest);
+            } catch (SocketTimeoutException e) {
+                int waitTime = (int) (Math.pow(2, attempt) *  BASE_DELAY_SECONDS);
+                System.out.println("Announce connection timeout, retrying in " + waitTime + " seconds");
+                Thread.sleep(waitTime * 1000L);
+            }
+        }
+        throw new  RuntimeException("Failed to make announce connection");
+    }
+
+    public static  byte[] buildRequest(long connectionId, byte[] infoHash, long left, int port, byte[] peerId) {
+        ByteBuffer buffer = allocate(98);
 
         buffer.putLong(connectionId);
         buffer.putInt(1);
@@ -26,7 +55,7 @@ public class AnnounceProtocol {
         buffer.put(transactionId);
 
         buffer.put(infoHash);
-        buffer.put(GeneratePeerId.generateId());
+        buffer.put(peerId);
 
         buffer.putLong(0L); //downloaded
         buffer.putLong(left); //left
@@ -45,17 +74,13 @@ public class AnnounceProtocol {
         return buffer.array();
     }
 
-
-
-
-    public static List<Peer> parseAnnounceResponse(byte[] responseData, byte[]  announceRequest) {
+    public static List<Peer> parseResponse(byte[] responseData, byte[]  announceRequest) {
         if(responseData == null || responseData.length < 20) {
             throw new RuntimeException("Invalid announce response");
         }
-        ByteBuffer buffer = ByteBuffer.wrap(responseData);
-        buffer.order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buffer = wrap(responseData);
 
-        int sentTransactionId = ByteBuffer.wrap(announceRequest).getInt(12);
+        int sentTransactionId = wrap(announceRequest).getInt(12);
         int action = buffer.getInt(0);
         int receivedTransactionId = buffer.getInt(4);
         int leechers  = buffer.getInt(8);
@@ -66,13 +91,11 @@ public class AnnounceProtocol {
             throw new RuntimeException("Invalid transaction id");
         }
 
-
         if (action != 1) {
             throw new RuntimeException("Expected announce response, got action: " + action);
         }
 
 //        System.out.println("Announce interval: " + interval + "s, seeders: " + seeders + ", leechers: " + leechers);
-
         List<Peer> peers = new ArrayList<>();
 
         for(int i = offset; i + 6 < responseData.length; i += 6) {
@@ -85,7 +108,6 @@ public class AnnounceProtocol {
             int port = ((responseData[i + 4] & 0xff) << 8) | (responseData[i + 5] & 0xff);
 
             peers.add(new Peer(ip, port));
-
         }
         return peers;
     }

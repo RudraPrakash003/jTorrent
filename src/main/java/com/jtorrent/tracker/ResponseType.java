@@ -1,4 +1,4 @@
-package com.jtorrent.tracker.protocol;
+package com.jtorrent.tracker;
 
 import java.nio.ByteBuffer;
 

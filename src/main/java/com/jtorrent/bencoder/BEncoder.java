@@ -16,10 +16,10 @@ public class BEncoder {
         switch (obj) {
             case String s -> {
                 byte[] bytes = s.getBytes(StandardCharsets.ISO_8859_1);
-                sb.append(bytes.length).append(':');
-                sb.append(s);
+                sb.append(bytes.length).append(':').append(s);
             }
             case Number n -> sb.append('i').append(n.longValue()).append('e');
+
             case List<?> list -> {
                 sb.append('l');
                 for (Object item : list) {
@@ -27,6 +27,7 @@ public class BEncoder {
                 }
                 sb.append('e');
             }
+
             case Map<?, ?> map -> {
                 sb.append('d');
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
@@ -37,6 +38,7 @@ public class BEncoder {
                 }
                 sb.append('e');
             }
+
             default -> throw new IllegalArgumentException("Cannot bencode type: " + obj.getClass());
         }
     }

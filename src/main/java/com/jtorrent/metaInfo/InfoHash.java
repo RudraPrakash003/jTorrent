@@ -14,6 +14,10 @@ public class InfoHash {
         }
 
         Map<String, Object> infoMap = (Map<String, Object>) info;
+/*
+        System.out.println("Info Map:");
+        infoMap.forEach((k,v)->{System.out.println(k+":"+v);});
+*/
 
         byte[] encodedInfo = BEncoder.encode(infoMap);
 

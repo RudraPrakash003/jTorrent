@@ -36,6 +36,10 @@ public class TorrentClient {
                 throw new RuntimeException("Invalid InfoHash length");
             }
 
+            int pieceCount = TorrentMetaData.pieceCount(torrent);
+            int pieceLength = TorrentMetaData.pieceLength(torrent);
+            long totalSize = TorrentMetaData.totalSize(torrent);
+
             byte[] peerId = ClientId.generateId();
 
             String announce = TorrentMetaData.announce(torrent);
@@ -43,7 +47,7 @@ public class TorrentClient {
 
             Tracker tracker = new Tracker();
             tracker.getPeers(announce, infoHash, torrent, peerId, peers -> {
-                PeerManager peerManager = new PeerManager(infoHash, peerId);
+                PeerManager peerManager = new PeerManager(infoHash, peerId, pieceCount,pieceLength, totalSize);
                 peerManager.connectToPeers(peers);
             });
 

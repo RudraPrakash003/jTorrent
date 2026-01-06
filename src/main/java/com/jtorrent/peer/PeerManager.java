@@ -1,5 +1,8 @@
 package com.jtorrent.peer;
 
+import com.jtorrent.piece.BlockTracker;
+import com.jtorrent.scheduler.RequestScheduler;
+
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -8,13 +11,30 @@ import java.util.concurrent.TimeUnit;
 public class PeerManager {
 
     private static final int MAX_PEERS = 20;
+
     private final byte[] infoHash;
     private final byte[] peerId;
+
+    private final int pieceCount;
+    private final int pieceLength;
+
+    private final long totalSize;
+
+    private final BlockTracker blockTracker;
+    private final RequestScheduler scheduler;
+
     private final ExecutorService peerPool;
 
-    public PeerManager(byte[] infoHash, byte[] peerId) {
+    public PeerManager(byte[] infoHash, byte[] peerId, int pieceCount, int pieceLength, long totalSize) {
         this.infoHash = infoHash;
         this.peerId = peerId;
+        this.pieceCount = pieceCount;
+        this.pieceLength = pieceLength;
+        this.totalSize = totalSize;
+
+        this.blockTracker = new BlockTracker(pieceCount, pieceLength, totalSize);
+        this.scheduler = new RequestScheduler(blockTracker);
+
         this.peerPool = Executors.newFixedThreadPool(MAX_PEERS);
     }
 
@@ -25,29 +45,21 @@ public class PeerManager {
                 .filter(PeerSelector::isValid)
                 .sorted(PeerSelector::peerPriority)
                 .limit(MAX_PEERS)
-                .forEach(this::connectPeer);
+                .forEach(peer -> peerPool.submit(() -> startSession(peer)));
     }
 
-    public void connectPeer(Peer peer) {
-        PeerConnection connection = new PeerConnection(peer, infoHash, peerId);
+    public void startSession(Peer peer) {
+        PeerConnection connection = new PeerConnection(peer, infoHash, peerId, pieceCount, pieceLength, totalSize, scheduler);
         try {
             connection.connect();
             System.out.println("Connected to peer: " + peer);
             connection.handshake();
-
-            peerPool.submit(() -> {
-                try{
-                    connection.startMessageLoop();
-                } catch (Exception ex) {
-                    connection.closeQuietly();
-                }
-            });
+            connection.startMessageLoop();
         } catch (Exception e) {
             connection.closeQuietly();
             System.out.println("Connection failed for Peer: " + peer + " -> " + e.getClass().getSimpleName());
         }
     }
-
 
     public void shutdown() {
         peerPool.shutdown();

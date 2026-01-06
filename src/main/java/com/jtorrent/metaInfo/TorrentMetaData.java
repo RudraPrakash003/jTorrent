@@ -2,6 +2,7 @@ package com.jtorrent.metaInfo;
 
 import com.jtorrent.bencoder.BDecoder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -53,5 +54,42 @@ public final class TorrentMetaData {
         }
 
         return ((Number) length).longValue();
+    }
+
+    public static int pieceLength(Map<String, Object> torrent) {
+        Object pieceLength = info(torrent).get("piece length");
+
+        if(!(pieceLength instanceof Number)) {
+            throw new IllegalArgumentException("Invalid torrent piece length");
+        }
+        return ((Number) pieceLength).intValue();
+    }
+
+    public static int pieceCount(Map<String, Object> torrent) {
+        return (int) ((totalSize(torrent) + pieceLength(torrent) - 1)/ pieceLength(torrent));
+    }
+
+    public static List<byte[]> pieceHashes(Map<String, Object> torrent) {
+        Object piecesObj = info(torrent).get("pieces");
+
+        if(!(piecesObj instanceof byte[])) {
+            throw new IllegalArgumentException("Invalid torrent pieces");
+        }
+
+        byte[] pieces = (byte[]) piecesObj;
+
+        if(pieces.length % 20 != 0) {
+            throw new IllegalArgumentException("Invalid torrent piece hash length");
+        }
+
+        int count = pieces.length / 20;
+        List<byte[]> hashes = new ArrayList<>(count);
+
+        for(int i = 0; i < count; i++) {
+            byte[] hash = new byte[20];
+            System.arraycopy(pieces, i * 20, hash, 0, 20);
+            hashes.add(hash);
+        }
+        return hashes;
     }
 }

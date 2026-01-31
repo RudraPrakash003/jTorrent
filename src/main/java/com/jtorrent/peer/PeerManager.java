@@ -1,6 +1,7 @@
 package com.jtorrent.peer;
 
 import com.jtorrent.piece.BlockTracker;
+import com.jtorrent.piece.PieceManager;
 import com.jtorrent.scheduler.RequestScheduler;
 
 import java.util.List;
@@ -22,10 +23,11 @@ public class PeerManager {
 
     private final BlockTracker blockTracker;
     private final RequestScheduler scheduler;
+    private final PieceManager pieceManager;
 
     private final ExecutorService peerPool;
 
-    public PeerManager(byte[] infoHash, byte[] peerId, int pieceCount, int pieceLength, long totalSize) {
+    public PeerManager(byte[] infoHash, byte[] peerId, int pieceCount, int pieceLength, long totalSize, List<byte[]> pieceHashes, String outputPath) {
         this.infoHash = infoHash;
         this.peerId = peerId;
         this.pieceCount = pieceCount;
@@ -33,7 +35,8 @@ public class PeerManager {
         this.totalSize = totalSize;
 
         this.blockTracker = new BlockTracker(pieceCount, pieceLength, totalSize);
-        this.scheduler = new RequestScheduler(blockTracker);
+        this.pieceManager = new PieceManager(pieceCount, pieceLength, pieceHashes, totalSize, outputPath);
+        this.scheduler = new RequestScheduler(blockTracker, pieceManager);
 
         this.peerPool = Executors.newFixedThreadPool(MAX_PEERS);
     }

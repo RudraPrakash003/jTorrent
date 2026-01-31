@@ -16,6 +16,10 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 public class PeerConnection implements AutoCloseable {
@@ -45,7 +49,8 @@ public class PeerConnection implements AutoCloseable {
 
     private final Map<Integer, Consumer<ByteBuffer>> handlers = new HashMap<>();
 
-
+    private ScheduledExecutorService keepAliveExecutor;
+    private ScheduledFuture<?> keepAliveTask;
 
     public PeerConnection(Peer peer, byte[] infoHash, byte[] peerId, int pieceCount, int pieceLength, long totalSize, RequestScheduler scheduler) {
         this.peer = peer;
@@ -61,10 +66,24 @@ public class PeerConnection implements AutoCloseable {
     public void connect() throws IOException {
         socket = new Socket();
         socket.connect(new InetSocketAddress(peer.ip(), peer.port()), 5_000);
-        socket.setSoTimeout(60_000);
+        socket.setSoTimeout(120_000);
+        socket.setKeepAlive(true);
 
         in = socket.getInputStream();
         out= socket.getOutputStream();
+
+        startKeepAlive();
+    }
+
+    private void startKeepAlive() {
+        keepAliveExecutor = Executors.newSingleThreadScheduledExecutor();
+        keepAliveTask = keepAliveExecutor.scheduleAtFixedRate(() -> {
+            try {
+                send(PeerMessageBuilder.buildKeepAlive());
+            } catch (Exception e) {
+                closeQuietly();
+            }
+        }, 60, 60, TimeUnit.SECONDS);
     }
 
     public void handshake() throws IOException {
@@ -103,11 +122,22 @@ public class PeerConnection implements AutoCloseable {
     public void startMessageLoop() throws Exception {
         PeerMessageReader reader = new PeerMessageReader();
 
-        reader.read(in, message -> {
-            if(running) {
-                handleMessage(message);
-            }
-        });
+        try{
+            reader.read(in, message -> {
+                if(running) {
+                    try {
+                        handleMessage(message);
+                    } catch (Exception e) {
+                        System.err.println("Error handling message from " + peer + ": " + e.getMessage());
+                    }
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("Message loop error for " + peer + ": " + e.getMessage());
+            throw e;
+        } finally {
+            closeQuietly();
+        }
     }
 
     public void handleMessage(byte[] message) {
@@ -253,12 +283,16 @@ public class PeerConnection implements AutoCloseable {
     @Override
     public void close() throws Exception {
         running = false;
-        if(in != null) {
-            in.close();
-        }
-        if(out != null) {
-            out.close();
-        }
+
+        if(keepAliveTask != null)
+            keepAliveTask.cancel(true);
+        if(keepAliveExecutor != null)
+            keepAliveExecutor.shutdown();
+
+        scheduler.onPeerDisconnected(this);
+
+        if(in != null) in.close();
+        if(out != null) out.close();
         if (socket != null && !socket.isClosed()) {
             socket.close();
         }

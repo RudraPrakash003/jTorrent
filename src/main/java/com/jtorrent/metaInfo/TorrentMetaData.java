@@ -72,11 +72,9 @@ public final class TorrentMetaData {
     public static List<byte[]> pieceHashes(Map<String, Object> torrent) {
         Object piecesObj = info(torrent).get("pieces");
 
-        if(!(piecesObj instanceof byte[])) {
+        if(!(piecesObj instanceof byte[] pieces)) {
             throw new IllegalArgumentException("Invalid torrent pieces");
         }
-
-        byte[] pieces = (byte[]) piecesObj;
 
         if(pieces.length % 20 != 0) {
             throw new IllegalArgumentException("Invalid torrent piece hash length");
@@ -91,5 +89,14 @@ public final class TorrentMetaData {
             hashes.add(hash);
         }
         return hashes;
+    }
+
+    public static String fileName(Map<String, Object> torrent) {
+        Object fileNameObj = info(torrent).get("name");
+        if(!(fileNameObj instanceof String)) {
+            throw new IllegalArgumentException("Invalid torrent name");
+        }
+
+        return (String) fileNameObj;
     }
 }

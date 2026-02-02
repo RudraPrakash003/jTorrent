@@ -29,8 +29,8 @@ public class TorrentClient {
 
            Map<String, Object> torrent = TorrentMetaData.decode(data);
 
-           System.out.println("Torrent File:");
-           torrent.forEach((k,v)-> System.out.println(k + ":" + v));
+//           System.out.println("Torrent File:");
+//           torrent.forEach((k,v)-> System.out.println(k + ":" + v));
 
             byte[] infoHash = InfoHash.getInfoHash(torrent); // receives SHA1 of BeEncoded info
             if(infoHash == null || infoHash.length != 20) {

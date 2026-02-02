@@ -60,7 +60,6 @@ public class BlockTracker {
         return requested != null && requested.get(blockIndex);
     }
 
-
     private int blocksInPiece (int pieceIndex){
         int length = pieceSize(pieceIndex);
         return (length + BLOCK_SIZE - 1) / BLOCK_SIZE;

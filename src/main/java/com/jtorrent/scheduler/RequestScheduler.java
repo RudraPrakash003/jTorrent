@@ -64,12 +64,10 @@ public class RequestScheduler {
 
         while(outstanding < PIPELINE_DEPTH) {
             int piece = currentPiece.computeIfAbsent(peer, p -> pickPiece(peer.getBitfield()));
-            activePieces.add(piece);
             if(piece == -1) {
                 piece = pickPiece(peer.getBitfield());
                 if(piece == -1) return;
                 currentPiece.put(peer, piece);
-                activePieces.add(piece);
             }
 
             Block block = blockTracker.nextBlockToRequest(piece);

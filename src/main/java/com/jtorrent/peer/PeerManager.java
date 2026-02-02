@@ -4,6 +4,7 @@ import com.jtorrent.piece.BlockTracker;
 import com.jtorrent.piece.PieceManager;
 import com.jtorrent.scheduler.RequestScheduler;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -11,14 +12,13 @@ import java.util.concurrent.TimeUnit;
 
 public class PeerManager {
 
-    private static final int MAX_PEERS = 20;
+    private static final int MAX_PEERS = 30;
 
     private final byte[] infoHash;
     private final byte[] peerId;
 
     private final int pieceCount;
     private final int pieceLength;
-
     private final long totalSize;
 
     private final BlockTracker blockTracker;
@@ -34,11 +34,18 @@ public class PeerManager {
         this.pieceLength = pieceLength;
         this.totalSize = totalSize;
 
+        try {
+            this.pieceManager = new PieceManager(pieceCount, pieceLength, pieceHashes, totalSize, outputPath);
+        } catch (IOException e) {
+            throw new RuntimeException("Error while creating output file: " + e.getMessage());
+        }
         this.blockTracker = new BlockTracker(pieceCount, pieceLength, totalSize);
-        this.pieceManager = new PieceManager(pieceCount, pieceLength, pieceHashes, totalSize, outputPath);
         this.scheduler = new RequestScheduler(blockTracker, pieceManager);
 
+
         this.peerPool = Executors.newFixedThreadPool(MAX_PEERS);
+
+        startProgressMonitor();
     }
 
     public void connectToPeers(List<Peer> peers) {
@@ -64,6 +71,23 @@ public class PeerManager {
         }
     }
 
+    private void startProgressMonitor() {
+        Thread monitor = new Thread(() -> {
+            while(!pieceManager.isComplete()) {
+                try {
+                    Thread.sleep(5000);
+                    System.out.printf("Download progress: %.2f%%\n", pieceManager.getProgress());
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+            System.out.println("Download Complete");
+            shutdown();
+        });
+        monitor.setDaemon(true);
+        monitor.start();
+    }
+
     public void shutdown() {
         peerPool.shutdown();
         try {
@@ -73,6 +97,12 @@ public class PeerManager {
         } catch (InterruptedException e) {
             peerPool.shutdownNow();
             Thread.currentThread().interrupt();
+        }
+
+        try {
+            pieceManager.close();
+        } catch (Exception e) {
+            System.err.println("Error closing piece manager - "  + e.getMessage());
         }
     }
 }

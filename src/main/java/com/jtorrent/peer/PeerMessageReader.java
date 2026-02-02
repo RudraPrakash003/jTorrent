@@ -26,7 +26,7 @@ public class PeerMessageReader {
                 buffer.mark();
                 int length = buffer.getInt();
 
-                if(length < 0 || length > 16 * 1024) {
+                if(length < 0 || length > 256 * 1024) {
                     throw new IOException("Invalid length: " + length);
                 }
 

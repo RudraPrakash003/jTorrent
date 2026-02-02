@@ -2,6 +2,7 @@ package com.jtorrent.metaInfo;
 
 import com.jtorrent.bencoder.BDecoder;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +73,12 @@ public final class TorrentMetaData {
     public static List<byte[]> pieceHashes(Map<String, Object> torrent) {
         Object piecesObj = info(torrent).get("pieces");
 
-        if(!(piecesObj instanceof byte[] pieces)) {
+        byte[] pieces;
+        if(piecesObj instanceof byte[]) {
+            pieces = (byte[]) piecesObj;
+        } else if(piecesObj instanceof String) {
+            pieces = ((String) piecesObj).getBytes(StandardCharsets.ISO_8859_1);
+        } else {
             throw new IllegalArgumentException("Invalid torrent pieces");
         }
 

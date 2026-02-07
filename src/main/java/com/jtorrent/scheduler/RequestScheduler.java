@@ -5,6 +5,8 @@ import com.jtorrent.peer.PeerMessageBuilder;
 import com.jtorrent.piece.Block;
 import com.jtorrent.piece.BlockTracker;
 import com.jtorrent.piece.PieceManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,6 +21,8 @@ public class RequestScheduler {
     private final Map<PeerConnection, Integer> inFlight = new ConcurrentHashMap<>();
     private final Map<PeerConnection, Integer> currentPiece = new ConcurrentHashMap<>();
     private final Set<Integer> activePieces = ConcurrentHashMap.newKeySet();
+
+    private static final Logger log = LoggerFactory.getLogger(RequestScheduler.class);
 
     public RequestScheduler(BlockTracker blockTracker, PieceManager pieceManager) {
         this.blockTracker = blockTracker;
@@ -37,7 +41,7 @@ public class RequestScheduler {
         blockTracker.markReceived(pieceIndex, blockIndex);
 
         if(blockTracker.isPieceComplete(pieceIndex)) {
-            System.out.println("Piece " + pieceIndex + " is being verified...");
+            log.info("Piece {} is being verified...", pieceIndex );
             if(!pieceManager.verifyAndSavePiece(pieceIndex)) {
                 blockTracker.resetPiece(pieceIndex);
             }
@@ -86,7 +90,7 @@ public class RequestScheduler {
                     block.length()
             ));
 
-            System.out.println("Requested for the pieceIndex: " + block.pieceIndex() + ", offset: " + block.offset() + ", length: " + block.length());
+            log.info("Requested for the pieceIndex: {}, offset: {}, length: {}" , block.pieceIndex(), block.offset(), block.length());
 
             outstanding++;
             inFlight.put(peer, outstanding);

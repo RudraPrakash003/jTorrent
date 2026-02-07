@@ -2,6 +2,8 @@ package com.jtorrent.tracker;
 
 import com.jtorrent.metaInfo.TorrentMetaData;
 import com.jtorrent.peer.Peer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
@@ -14,6 +16,7 @@ import static com.jtorrent.util.Buffers.allocate;
 import static com.jtorrent.util.Buffers.wrap;
 
 public class TrackerAnnounce {
+    private static final Logger log = LoggerFactory.getLogger(TrackerAnnounce.class);
     private TrackerAnnounce() {}
 
     private static final int MAX_RETRIES = 8;
@@ -37,10 +40,11 @@ public class TrackerAnnounce {
                 return parseResponse(responseData, announceRequest);
             } catch (SocketTimeoutException e) {
                 int waitTime = (int) (Math.pow(2, attempt) *  BASE_DELAY_SECONDS);
-                System.out.println("Announce connection timeout, retrying in " + waitTime + " seconds");
+                log.warn("Tracker {}:{} Announce timeout (attempt {}/{}) retrying in {} Seconds", host, port, attempt + 1, MAX_RETRIES, waitTime);
                 Thread.sleep(waitTime * 1000L);
             }
         }
+        log.error("Failed to connect to Tracker {}:{} Announce after {} retries", host, port, MAX_RETRIES);
         throw new  RuntimeException("Failed to make announce connection");
     }
 
@@ -95,7 +99,7 @@ public class TrackerAnnounce {
             throw new RuntimeException("Expected announce response, got action: " + action);
         }
 
-//        System.out.println("Announce interval: " + interval + "s, seeders: " + seeders + ", leechers: " + leechers);
+        log.info("seeders: " + seeders + ", leechers: " + leechers);
         List<Peer> peers = new ArrayList<>();
 
         for(int i = offset; i + 6 < responseData.length; i += 6) {

@@ -8,17 +8,11 @@ import java.util.Map;
 public class InfoHash {
 
     public static byte[] getInfoHash(Map<String, Object> torrent) {
-        Object info = torrent.get("info");
-        if(!(info instanceof Map)) {
-            throw new IllegalArgumentException("Info dictionary missing");
-        }
-
-        Map<String, Object> infoMap = (Map<String, Object>) info;
+        Map<String, Object> infoMap = TorrentMetaData.info(torrent);
 /*
         System.out.println("Info Map:");
         infoMap.forEach((k,v)->{System.out.println(k+":"+v);});
 */
-
         byte[] encodedInfo = BEncoder.encode(infoMap);
 
         try {

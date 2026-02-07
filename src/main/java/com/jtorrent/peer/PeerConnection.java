@@ -1,8 +1,12 @@
 package com.jtorrent.peer;
 
-import com.jtorrent.scheduler.RequestScheduler;
 
-import static com.jtorrent.util.Buffers.wrap;
+import com.jtorrent.scheduler.RequestScheduler;
+import com.jtorrent.validation.MessageValidator;
+import com.jtorrent.validation.MessageValidator.ParsedMessage;
+import com.jtorrent.validation.MessageValidator.ValidationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,18 +26,23 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+
 public class PeerConnection implements AutoCloseable {
 
+    private static final Logger log = LoggerFactory.getLogger(PeerConnection.class);
     private final Peer peer;
     private final byte[] infoHash;
     private final byte[] peerId;
     private final int pieceCount;
     private final int pieceLength;
     private final long totalSize;
+    private int consecutiveErrors = 0;
 
     private final RequestScheduler scheduler;
+    private final MessageValidator messageValidator;
 
     private static final int MAX_MESSAGE_SIZE = 256 * 1024;
+    private static final int MAX_CONSECUTIVE_ERRORS = 5;
 
     private volatile boolean running = true;
 
@@ -60,6 +69,7 @@ public class PeerConnection implements AutoCloseable {
         this.pieceLength = pieceLength;
         this.totalSize = totalSize;
         this.scheduler = scheduler;
+        this.messageValidator = new MessageValidator(pieceCount, pieceLength, totalSize);
         registerHandlers();
     }
 
@@ -71,6 +81,8 @@ public class PeerConnection implements AutoCloseable {
 
         in = socket.getInputStream();
         out= socket.getOutputStream();
+
+        log.info("Connected to peer {}", peer);
 
         startKeepAlive();
     }
@@ -90,6 +102,7 @@ public class PeerConnection implements AutoCloseable {
         send(PeerMessageBuilder.buildHandshake(infoHash, peerId));
         byte[] response = readFully(68);
         validateHandshake(response, infoHash, peerId);
+        log.info("Handshake succeeded for peer {}", peer);
     }
 
     private static void validateHandshake(byte[] response, byte[] expectedInfoHash, byte[] localPeerId) {
@@ -121,19 +134,29 @@ public class PeerConnection implements AutoCloseable {
 
     public void startMessageLoop() throws Exception {
         PeerMessageReader reader = new PeerMessageReader();
-
         try{
             reader.read(in, message -> {
                 if(running) {
                     try {
                         handleMessage(message);
-                    } catch (Exception e) {
-                        System.err.println("Error handling message from " + peer + ": " + e.getMessage());
+                        consecutiveErrors = 0;
+                    } catch (IllegalStateException e) {
+                        log.error("Protocol violation from {}", peer, e);
+                        closeQuietly();
+                    }
+                    catch (Exception e) {
+                        consecutiveErrors++;
+                        log.error("Error handling message from {} - disconnecting", peer, e);
+
+                        if(consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                            log.error("Consecutive errors, disconnecting from {}", peer, e);
+                            closeQuietly();
+                        }
                     }
                 }
             });
         } catch (Exception e) {
-            System.err.println("Message loop error for " + peer + ": " + e.getMessage());
+            log.error("Message loop error for {}", peer, e);
             throw e;
         } finally {
             closeQuietly();
@@ -141,20 +164,21 @@ public class PeerConnection implements AutoCloseable {
     }
 
     public void handleMessage(byte[] message) {
-        ByteBuffer buffer = wrap(message);
+        try {
+            ParsedMessage parsed = messageValidator.validateAndParse(message);
 
-        int length = buffer.getInt();
-        if(length == 0) return; //keep-alive
+            if (parsed.isKeepAlive()) return; //keep-alive
 
-        if(length < 0 || length > MAX_MESSAGE_SIZE) {
-            throw new RuntimeException("Invalid message size");
-        }
+            Consumer<ByteBuffer> handler = handlers.get(parsed.messageId);
 
-        int messageId = buffer.get() & 0xff;
-        Consumer<ByteBuffer> handler = handlers.get(messageId);
-
-        if(handler != null) {
-            handler.accept(buffer);
+            if (handler != null) {
+                handler.accept(parsed.payload);
+            }
+        } catch (ValidationException e) {
+            log.error("Invalid message received from {}", peer, e);
+            closeQuietly();
+        } catch (Exception e) {
+            log.error("Error parsing message from {}", peer, e);
         }
    }
 
@@ -162,35 +186,38 @@ public class PeerConnection implements AutoCloseable {
         //choke
         handlers.put(0, b -> {
             peerChoking = true;
-            System.out.println(peer + " choked you");
+            log.debug("peer {} choked you", peer);
         });
 
         //unchoke
         handlers.put(1, b -> {
             peerChoking = false;
-            System.out.println("Received unchoke from " + peer);
+            log.debug("Received unchoke from {}", peer);
             scheduler.onUnchoke(this);
         });
 
         //interested
         handlers.put(2, b -> {
             peerInterested = true;
-            System.out.println(peer + " is interested");
+            log.debug("{} is interested", peer);
         });
 
         //not interested
         handlers.put(3, b -> {
             peerInterested = false;
-            System.out.println(peer + " is not interested");
+            log.debug("{} is not interested", peer);
         });
 
         //have
         handlers.put(4, b -> {
             int pieceIndex = b.getInt();
-            if(bitfield != null && pieceIndex < pieceCount) {
+            if(bitfield != null) {
+                bitfield.set(pieceIndex);
+            } else {
+                bitfield = new BitSet(pieceCount);
                 bitfield.set(pieceIndex);
             }
-            System.out.println(peer + " has piece " + pieceIndex);
+            log.debug("{} has piece {}", peer, pieceIndex);
         });
 
         //bitfield
@@ -203,18 +230,13 @@ public class PeerConnection implements AutoCloseable {
             byte[] raw = new byte[b.remaining()];
             b.get(raw);
 
-            int expectedBytes = (pieceCount + 7) / 8;
-            if(raw.length != expectedBytes) {
-                throw new RuntimeException("Invalid bitfield length");
-            }
-
             bitfield = BitSet.valueOf(raw);
-            System.out.println("Received bitfield from " + peer);
+            log.debug("Received bitfield from {}", peer);
 
             if(!amInterested) {
                 send(PeerMessageBuilder.buildInterested());
                 amInterested = true;
-                System.out.println("Sent interested to " + peer);
+                log.debug("Sent interested to {}", peer);
             }
         });
 
@@ -224,7 +246,7 @@ public class PeerConnection implements AutoCloseable {
             int begin = b.getInt();
             int length = b.getInt();
 
-            System.out.println(peer + " requested piece " + index + " offset " + begin + " length " + length);
+            log.debug("{} requested piece: {} offset: {} length: {} ", peer, index, begin, length);
         });
 
         //piece
@@ -237,7 +259,7 @@ public class PeerConnection implements AutoCloseable {
             int begin = b.getInt();
             byte[] block = new byte[b.remaining()];
             b.get(block);
-            System.out.println("Received piece " + index + " offset " + begin + " from " + peer);
+            log.debug("Received piece: {} offset: {} from {}", index, begin, peer);
             scheduler.onBlockReceived(this, index, begin, block);
         });
 
@@ -247,7 +269,7 @@ public class PeerConnection implements AutoCloseable {
             int begin = b.getInt();
             int length = b.getInt();
 
-            System.out.println(peer + " cancelled request for piece " + index);
+            log.debug("{} cancelled request for piece {} offset {} length {}", peer, index, begin,length);
         });
 
     }
@@ -257,6 +279,7 @@ public class PeerConnection implements AutoCloseable {
             out.write(message);
             out.flush();
         } catch (IOException e) {
+            log.warn("Send failed to peer {} - disconnecting", peer, e);
             closeQuietly();
         }
     }
@@ -291,6 +314,7 @@ public class PeerConnection implements AutoCloseable {
 
         scheduler.onPeerDisconnected(this);
 
+        log.info("Disconnected from peer {}", peer);
         if(in != null) in.close();
         if(out != null) out.close();
         if (socket != null && !socket.isClosed()) {

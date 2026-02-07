@@ -10,6 +10,7 @@ import static com.jtorrent.util.Buffers.allocate;
 public class PeerMessageReader {
 
     private static final int MAX_BUFFER_SIZE = 256 * 1024;
+    private static final int MAX_BLOCK_SIZE = 256 * 1024;
 
     private ByteBuffer buffer = allocate(64 * 1024);
 
@@ -26,7 +27,7 @@ public class PeerMessageReader {
                 buffer.mark();
                 int length = buffer.getInt();
 
-                if(length < 0 || length > 256 * 1024) {
+                if(length < 0 || length > MAX_BLOCK_SIZE) {
                     throw new IOException("Invalid length: " + length);
                 }
 

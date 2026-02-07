@@ -43,7 +43,6 @@ public class PeerSelector {
     private static int scorePeer(Peer peer) {
         int score = 0;
         score += portPenalty(peer.port());
-        score += Math.random() * 10;
         return score;
     }
 

@@ -1,5 +1,8 @@
 package com.jtorrent.tracker;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
@@ -8,6 +11,8 @@ import static com.jtorrent.util.Buffers.allocate;
 
 public class TrackerConnection {
     private TrackerConnection() {}
+
+    private static final Logger log = LoggerFactory.getLogger(TrackerConnection.class);
 
     private static final long PROTOCOL_ID = 0x41727101980L;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -29,10 +34,11 @@ public class TrackerConnection {
                 return parseConnectResponse(responseData, connectionRequest);
             } catch (SocketTimeoutException e) {
                 int waitTime = (int) Math.pow(2, attempt) * BASE_DELAY_SECONDS;
-                System.out.println("Connection timeout, retrying in " + waitTime + " Seconds");
+                log.warn("Tracker {}:{} timeout (attempt {}/{}) retrying in {} Seconds", host, port, attempt + 1, MAX_RETRIES, waitTime);
                 Thread.sleep(waitTime * 1000L);
             }
         }
+        log.error("Failed to connect to Tracker {}:{} after {} retries", host, port, MAX_RETRIES);
         throw new RuntimeException("Failed to connect to the tracker");
     }
 
@@ -45,7 +51,6 @@ public class TrackerConnection {
         byte[] transactionId = new byte[4];
         RANDOM.nextBytes(transactionId);
         buffer.put(transactionId);
-//            System.out.println(buffer.toString());
         return buffer.array();
     }
 

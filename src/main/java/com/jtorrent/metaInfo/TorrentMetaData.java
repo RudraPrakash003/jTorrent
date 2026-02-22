@@ -21,19 +21,11 @@ public final class TorrentMetaData {
     }
 
     public static Map<String, Object> info(Map<String, Object> torrent) {
-        Object info = torrent.get("info");
-        if(!(info instanceof Map)) {
-            throw new IllegalArgumentException("Missing info dictionary");
-        }
-        return (Map<String, Object>) info;
+        return (Map<String, Object>) torrent.get("info");
     }
 
     public static String announce(Map<String, Object> torrent) {
-        Object announceObj = torrent.get("announce");
-        if(announceObj == null) {
-            throw new RuntimeException("Announce key not found in torrent file");
-        }
-        return announceObj.toString();
+        return torrent.get("announce").toString();
     }
 
     public static boolean isMultiFile(Map<String, Object> torrent) {
@@ -49,43 +41,29 @@ public final class TorrentMetaData {
                     .mapToLong(f -> ((Number) f.get("length")).longValue())
                     .sum();
         }
-        Object length = info.get("length");
-        if (!(length instanceof Number)) {
-            throw new IllegalArgumentException("Invalid torrent length");
-        }
-
-        return ((Number) length).longValue();
+        return ((Number) info.get("length")).longValue();
     }
 
     public static int pieceLength(Map<String, Object> torrent) {
-        Object pieceLength = info(torrent).get("piece length");
-
-        if(!(pieceLength instanceof Number)) {
-            throw new IllegalArgumentException("Invalid torrent piece length");
-        }
-        return ((Number) pieceLength).intValue();
+        return ((Number) info(torrent).get("piece length")).intValue();
     }
 
     public static int pieceCount(Map<String, Object> torrent) {
         return (int) ((totalSize(torrent) + pieceLength(torrent) - 1)/ pieceLength(torrent));
     }
 
-    public static List<byte[]> pieceHashes(Map<String, Object> torrent) {
+    public static byte[] piecesRaw(Map<String, Object> torrent) {
         Object piecesObj = info(torrent).get("pieces");
+        if(piecesObj instanceof byte[])
+            return  (byte[]) piecesObj;
+        else if(piecesObj instanceof String)
+            return  ((String) piecesObj).getBytes(StandardCharsets.ISO_8859_1);
+        else throw new IllegalArgumentException("Invalid torrent pieces");
+    }
 
-        byte[] pieces;
-        if(piecesObj instanceof byte[]) {
-            pieces = (byte[]) piecesObj;
-        } else if(piecesObj instanceof String) {
-            pieces = ((String) piecesObj).getBytes(StandardCharsets.ISO_8859_1);
-        } else {
-            throw new IllegalArgumentException("Invalid torrent pieces");
-        }
-
-        if(pieces.length % 20 != 0) {
-            throw new IllegalArgumentException("Invalid torrent piece hash length");
-        }
-
+    public static List<byte[]> pieceHashes(Map<String, Object> torrent) {
+        byte[] pieces = piecesRaw(torrent);
+        
         int count = pieces.length / 20;
         List<byte[]> hashes = new ArrayList<>(count);
 
@@ -98,11 +76,6 @@ public final class TorrentMetaData {
     }
 
     public static String fileName(Map<String, Object> torrent) {
-        Object fileNameObj = info(torrent).get("name");
-        if(!(fileNameObj instanceof String)) {
-            throw new IllegalArgumentException("Invalid torrent name");
-        }
-
-        return (String) fileNameObj;
+        return (String) info(torrent).get("name");
     }
 }

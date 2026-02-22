@@ -1,5 +1,7 @@
 package com.jtorrent.validation;
 
+import com.jtorrent.exception.ValidationException;
+
 import java.nio.ByteBuffer;
 
 import static com.jtorrent.util.Buffers.wrap;
@@ -173,31 +175,17 @@ public class MessageValidator {
             throw new ValidationException("Block extends beyond piece boundary: offset - " + begin + ", length - " + length + ", piece size - " + pieceSize);
     }
 
-    public static class ParsedMessage {
-        private static final ParsedMessage KEEP_ALIVE = new ParsedMessage(-1, 0, null);
-
-        public final int messageId;
-        public final int length;
-        public final ByteBuffer payload;
-
-        public ParsedMessage(int messageId, int length, ByteBuffer payload) {
-            this.messageId = messageId;
-            this.length = length;
-            this.payload = payload;
-        }
+    public record ParsedMessage(int messageId, int length, ByteBuffer payload) {
+            private static final ParsedMessage KEEP_ALIVE = new ParsedMessage(-1, 0, null);
 
         public static ParsedMessage keepAlive() {
-            return KEEP_ALIVE;
+                return KEEP_ALIVE;
+            }
+
+            public boolean isKeepAlive() {
+                return messageId == -1;
+            }
         }
 
-        public boolean isKeepAlive() {
-            return messageId == -1;
-        }
-    }
 
-    public static class ValidationException extends Exception{
-        public ValidationException(String message) {
-            super(message);
-        }
-    }
 }

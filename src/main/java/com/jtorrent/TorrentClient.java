@@ -5,6 +5,7 @@ import com.jtorrent.metaInfo.TorrentMetaData;
 import com.jtorrent.peer.PeerManager;
 import com.jtorrent.tracker.Tracker;
 import com.jtorrent.metaInfo.ClientId;
+import com.jtorrent.validation.TorrentValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,8 +19,8 @@ public class TorrentClient {
     private static final Logger log = LoggerFactory.getLogger(TorrentClient.class );
 
     public static void main(String[] args) {
-        if(args == null) {
-            log.error("Torrent file is not provided.");
+        if (args.length == 0) {
+            log.error("Torrent file path is not provided.");
             System.exit(1);
         }
 
@@ -33,35 +34,35 @@ public class TorrentClient {
         try(FileInputStream input = new FileInputStream(resource)) {
            byte[] data = input.readAllBytes();
            Map<String, Object> torrent = TorrentMetaData.decode(data);
-
            log.info("Torrent file decoded successfully.");
+
+           TorrentValidator.validateTorrent(torrent);
 //           System.out.println("Torrent File:");
 //           torrent.forEach((k,v)-> System.out.println(k + ":" + v));
-            byte[] infoHash = InfoHash.getInfoHash(torrent); // receives SHA1 of BeEncoded info
-            if(infoHash == null || infoHash.length != 20) {
-                throw new RuntimeException("Invalid InfoHash length");
-            }
+           byte[] infoHash = InfoHash.getInfoHash(torrent); // receives SHA1 of BeEncoded info
+           if(infoHash == null || infoHash.length != 20) {
+               throw new RuntimeException("Invalid InfoHash length");
+           }
 
-            int pieceCount = TorrentMetaData.pieceCount(torrent);
-            int pieceLength = TorrentMetaData.pieceLength(torrent);
-            long totalSize = TorrentMetaData.totalSize(torrent);
-            String announce = TorrentMetaData.announce(torrent);
-            List<byte[]> pieceHashes = TorrentMetaData.pieceHashes(torrent);
-            String fileName = TorrentMetaData.fileName(torrent);
+           int pieceCount = TorrentMetaData.pieceCount(torrent);
+           int pieceLength = TorrentMetaData.pieceLength(torrent);
+           long totalSize = TorrentMetaData.totalSize(torrent);
+           String announce = TorrentMetaData.announce(torrent);
+           List<byte[]> pieceHashes = TorrentMetaData.pieceHashes(torrent);
+           String fileName = TorrentMetaData.fileName(torrent);
 
-            log.info("Torrent info: name={}, size={}, pieces count={}, pieceLength={}", fileName, totalSize, pieceCount, pieceLength);
-            String outputPath = "D:/" + fileName;
+           log.info("Torrent info: name={}, size={}, pieces count={}, pieceLength={}", fileName, totalSize, pieceCount, pieceLength);
+           String outputPath = "D:/" + fileName;
 
-            log.info("Torrent download path: {}", outputPath);
-            byte[] peerId = ClientId.generateId();
+           log.info("Torrent download path: {}", outputPath);
+           byte[] peerId = ClientId.generateId();
 
-            log.info("Connecting to Tracker: {}", announce);
-            Tracker tracker = new Tracker();
-            tracker.getPeers(announce, infoHash, torrent, peerId, peers -> {
-                PeerManager peerManager = new PeerManager(infoHash, peerId, pieceCount, pieceLength, totalSize, pieceHashes, outputPath);
-                peerManager.connectToPeers(peers);
-            });
-
+           log.info("Connecting to Tracker: {}", announce);
+           Tracker tracker = new Tracker();
+           tracker.getPeers(announce, infoHash, torrent, peerId, peers -> {
+               PeerManager peerManager = new PeerManager(infoHash, peerId, pieceCount, pieceLength, totalSize, pieceHashes, outputPath);
+               peerManager.connectToPeers(peers);
+           });
         } catch (Exception e) {
             log.error("Fatal error in TorrentClient", e);
             System.exit(1);

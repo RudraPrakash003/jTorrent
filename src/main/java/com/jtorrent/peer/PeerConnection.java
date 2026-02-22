@@ -4,7 +4,7 @@ package com.jtorrent.peer;
 import com.jtorrent.scheduler.RequestScheduler;
 import com.jtorrent.validation.MessageValidator;
 import com.jtorrent.validation.MessageValidator.ParsedMessage;
-import com.jtorrent.validation.MessageValidator.ValidationException;
+import com.jtorrent.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -169,10 +169,10 @@ public class PeerConnection implements AutoCloseable {
 
             if (parsed.isKeepAlive()) return; //keep-alive
 
-            Consumer<ByteBuffer> handler = handlers.get(parsed.messageId);
+            Consumer<ByteBuffer> handler = handlers.get(parsed.messageId());
 
             if (handler != null) {
-                handler.accept(parsed.payload);
+                handler.accept(parsed.payload());
             }
         } catch (ValidationException e) {
             log.error("Invalid message received from {}", peer, e);

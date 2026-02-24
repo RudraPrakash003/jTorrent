@@ -22,7 +22,7 @@ public class Tracker {
             log.info("Tracker connection established {}:{} connectionId={}", host, port, connectionId);
 
             List<Peer> peers = TrackerAnnounce.announce(udp, connectionId, infoHash, torrent, host, port, peerId);
-            log.info("Tracker announce successful {}:{} peers={} seeders/leechers received", host, port, peers.size());
+            log.info("Tracker announce successful {}:{} peers={} received", host, port, peers.size());
 
             callback.accept(peers);
         } catch (Exception e) {

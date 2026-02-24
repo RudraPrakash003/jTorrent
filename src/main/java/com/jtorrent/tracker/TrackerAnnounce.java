@@ -99,7 +99,7 @@ public class TrackerAnnounce {
             throw new RuntimeException("Expected announce response, got action: " + action);
         }
 
-        log.info("seeders: " + seeders + ", leechers: " + leechers);
+        log.info("seeders: {}, leechers: {}", seeders, leechers);
         List<Peer> peers = new ArrayList<>();
 
         for(int i = offset; i + 6 < responseData.length; i += 6) {

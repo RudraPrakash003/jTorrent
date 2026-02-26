@@ -2,6 +2,7 @@ package com.jtorrent.peer;
 
 import com.jtorrent.piece.BlockTracker;
 import com.jtorrent.piece.PieceManager;
+import com.jtorrent.statistics.ProgressBar;
 import com.jtorrent.scheduler.RequestScheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +114,7 @@ public class PeerManager {
             while(!pieceManager.isComplete()) {
                 try {
                     Thread.sleep(5000);
-                    log.info("Download progress: {}%", String.format("%.2f", pieceManager.getProgress()));
+                    ProgressBar.showProgressBar(pieceManager.getDownloaded(), totalSize);
                 } catch (InterruptedException e) {
                     log.debug("Progress monitor interrupted");
                     Thread.currentThread().interrupt();

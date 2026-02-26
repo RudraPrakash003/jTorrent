@@ -105,8 +105,8 @@ public class PieceManager implements AutoCloseable{
         return verifiedPieces.cardinality() == pieceCount;
     }
 
-    public double getProgress() {
-        return (double)totalDownloaded / totalSize * 100.0;
+    public double getDownloaded() {
+        return (double)totalDownloaded;
     }
 
     private int getPieceLength(int pieceIndex) {
